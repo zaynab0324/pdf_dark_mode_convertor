@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="author" content="Afrah Zainab">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Dark Mode Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            background-color: #222;
+            color: #fff;
+        }
+        #custom-upload {
+            display: inline-block;
+            background-color: #444;
+            color: #fff;
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #555;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        #custom-upload:hover {
+            background-color: #070707;
+            border-color: aquamarine;
+        }
+        #file-upload {
+            display: none; /* Hide the actual file input */
+        }
+        #save-pdf {
+            position: fixed;
+            top: 260px;
+            left: 5px;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #444;
+            color: #fff;
+            border: 1px solid blanchedalmond;
+            /* cursor: pointer; */
+            cursor: grab;
+            transition: transform 0.3s ease; /* Add transition for smooth movement */
+            z-index: 1000; /* Ensure it stays above other elements */
+        }
+        #save-pdf.move {
+            transform: translateX(150px); /* Move button to the right */
+        }
+        #save-pdf:hover{
+            background-color: #070707;
+            color: rgb(189, 255, 127);
+            border-color: #e4e713;
+
+        }
+        h3{
+            font-size: medium;
+            font-weight: lighter;
+           
+            color: aquamarine;
+        }
+        h1{
+        font-size: 48px;
+            
+            background: linear-gradient(90deg, #0d10d1, #0ad878);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 10px;
+            border: 3px solid aquamarine;
+            
+        }
+    </style>
+</head>
+<body>
+
+    <h1>"Illuminate the Dark: Transform Your PDFs with Dark Mode Elegance!"</h1>
+    <details>
+        <summary>Hii:</summary>
+        kya brightness se aapki b aankh ka bhosda horaha hai then choose your file and convert it to dark mode !  ...have healthy eyesight!!
+            </details>
+
+        
+
+    </h3>
+    
+    <!-- Custom file upload button -->
+    <label for="file-upload" id="custom-upload">Choose File</label>
+    <input type="file" id="file-upload" accept="application/pdf">
+
+    <div id="pdf-render"></div>
+    <button id="save-pdf">Save Dark Mode PDF</button>
+
+    <script>
+        const fileInput = document.getElementById('file-upload');
+        const pdfRender = document.getElementById('pdf-render');
+        const saveButton = document.getElementById('save-pdf');
+
+        let canvases = [];  // Store rendered canvases for saving
+
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(file);
+                reader.onload = function() {
+                    const pdfData = new Uint8Array(reader.result);
+                    const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+
+                    loadingTask.promise.then(function(pdf) {
+                        const numPages = pdf.numPages;
+
+                        // Clear previous content
+                        pdfRender.innerHTML = '';
+                        canvases = []; // Reset canvases
+
+                        // Loop through each page
+                        for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
+                            pdf.getPage(pageNumber).then(function(page) {
+                                const viewport = page.getViewport({ scale: 1.5 });
+
+                                // Create a canvas for each page
+                                const canvas = document.createElement('canvas');
+                                const context = canvas.getContext('2d');
+                                canvas.height = viewport.height;
+                                canvas.width = viewport.width;
+
+                                const renderContext = {
+                                    canvasContext: context,
+                                    viewport: viewport
+                                };
+
+                                // Render the page on the canvas
+                                page.render(renderContext).promise.then(function() {
+                                    // Apply dark mode effect directly to canvas pixels
+                                    invertCanvasColors(context, canvas.width, canvas.height);
+                                    canvases.push(canvas); // Store rendered canvas
+                                });
+
+                                // Append the canvas to the container
+                                pdfRender.appendChild(canvas);
+                            });
+                        }
+                    });
+                };
+            }
+        });
+
+        saveButton.addEventListener('click', function() {
+            if (canvases.length === 0) {
+                alert("No PDF pages rendered to save.");
+                return;
+            }
+
+            // Initialize jsPDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+
+            canvases.forEach((canvas, index) => {
+                const imgData = canvas.toDataURL('image/jpeg', 1.0); // Get the dark mode canvas as image
+                const imgWidth = 210; // A4 page width in mm (for jsPDF)
+                const pageHeight = 297; // A4 page height in mm
+                const imgHeight = (canvas.height * imgWidth) / canvas.width; // Maintain aspect ratio
+
+                if (index > 0) {
+                    pdf.addPage();
+                }
+
+                // Add the dark mode image as a page in the PDF
+                pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+
+                // If image height is more than page height, scale to fit the page height
+                if (imgHeight > pageHeight) {
+                    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, pageHeight);
+                }
+            });
+
+            // Save the PDF in dark mode
+            pdf.save('dark_mode_pdf.pdf');
+        });
+
+        // Function to invert colors directly on the canvas
+        function invertCanvasColors(context, width, height) {
+            const imageData = context.getImageData(0, 0, width, height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                // Invert the RGB values
+                data[i] = 255 - data[i];     // Red
+                data[i + 1] = 255 - data[i + 1]; // Green
+                data[i + 2] = 255 - data[i + 2]; // Blue
+                // Alpha channel (data[i + 3]) is left unchanged
+            }
+
+            // Put the modified image data back to the canvas
+            context.putImageData(imageData, 0, 0);
+        }
+    </script>
+    <footer>
+        <p>&copy; 2024 Afrah Zainab. All rights reserved.</p>
+    </footer>
+    
+
+</body>
+</html>
